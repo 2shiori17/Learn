@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Fields};
+use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, Ident};
 
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -19,6 +19,7 @@ fn struct_builder(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let partial = partial(&data.fields);
     let init = init(&data.fields);
     let setters = setters(&data.fields);
+    let build = build(&target, &data.fields);
 
     TokenStream::from(quote! {
         impl #target {
@@ -35,46 +36,78 @@ fn struct_builder(input: &DeriveInput, data: &DataStruct) -> TokenStream {
 
         impl #builder {
             #setters
+
+            pub fn build(&mut self)
+                -> std::result::Result<#target, std::boxed::Box<dyn std::error::Error>>
+            {
+                #build
+            }
         }
     })
 }
 
+fn fields_map<F>(fields: &Fields, f: F) -> TokenStream2
+where
+    F: FnMut(&Field) -> TokenStream2,
+{
+    fields.iter().map(f).flatten().collect()
+}
+
 fn partial(fields: &Fields) -> TokenStream2 {
-    fields
-        .iter()
-        .map(|field| {
-            let ty = &field.ty;
-            let ident = &field.ident;
-            quote! { #ident: std::option::Option<#ty>, }
-        })
-        .flatten()
-        .collect()
+    fields_map(fields, |field| {
+        let ty = &field.ty;
+        let ident = &field.ident;
+        quote! { #ident: std::option::Option<#ty>, }
+    })
 }
 
 fn init(fields: &Fields) -> TokenStream2 {
-    fields
-        .iter()
-        .map(|field| {
-            let ident = &field.ident;
-            quote! { #ident: None, }
-        })
-        .flatten()
-        .collect()
+    fields_map(fields, |field| {
+        let ident = &field.ident;
+        quote! { #ident: None, }
+    })
 }
 
 fn setters(fields: &Fields) -> TokenStream2 {
-    fields
-        .iter()
-        .map(|fields| {
-            let ty = &fields.ty;
-            let ident = &fields.ident;
-            quote! {
-                pub fn #ident(&mut self, #ident: #ty) -> &mut Self {
-                    self.#ident = Some(#ident);
-                    self
-                }
+    fields_map(fields, |field| {
+        let ty = &field.ty;
+        let ident = &field.ident;
+        quote! {
+            pub fn #ident(&mut self, #ident: #ty) -> &mut Self {
+                self.#ident = Some(#ident);
+                self
             }
-        })
-        .flatten()
-        .collect()
+        }
+    })
+}
+
+fn build(target: &Ident, fields: &Fields) -> TokenStream2 {
+    let idents = fields_map(fields, |field| {
+        let ident = &field.ident;
+        quote! { #ident, }
+    });
+
+    let self_idents = fields_map(fields, |field| {
+        let ident = &field.ident;
+        quote! { &self.#ident, }
+    });
+
+    let some_idents = fields_map(fields, |field| {
+        let ident = &field.ident;
+        quote! { Some(#ident), }
+    });
+
+    let clone_idents = fields_map(fields, |field| {
+        let ident = &field.ident;
+        quote! { #ident.clone(), }
+    });
+
+    quote! {
+        let (#idents) = match (#self_idents) {
+            (#some_idents) => (#clone_idents),
+            _ => return Err("not set".into()),
+        };
+
+        Ok(#target { #idents })
+    }
 }
