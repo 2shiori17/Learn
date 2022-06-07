@@ -15,8 +15,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
 fn struct_builder(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let target = &input.ident;
     let builder = format_ident!("{}Builder", target);
+
     let partial = partial(&data.fields);
     let init = init(&data.fields);
+    let setters = setters(&data.fields);
+
     TokenStream::from(quote! {
         impl #target {
             pub fn builder() -> #builder {
@@ -28,6 +31,10 @@ fn struct_builder(input: &DeriveInput, data: &DataStruct) -> TokenStream {
 
         pub struct #builder {
             #partial
+        }
+
+        impl #builder {
+            #setters
         }
     })
 }
@@ -50,6 +57,23 @@ fn init(fields: &Fields) -> TokenStream2 {
         .map(|field| {
             let ident = &field.ident;
             quote! { #ident: None, }
+        })
+        .flatten()
+        .collect()
+}
+
+fn setters(fields: &Fields) -> TokenStream2 {
+    fields
+        .iter()
+        .map(|fields| {
+            let ty = &fields.ty;
+            let ident = &fields.ident;
+            quote! {
+                pub fn #ident(&mut self, #ident: #ty) -> &mut Self {
+                    self.#ident = Some(#ident);
+                    self
+                }
+            }
         })
         .flatten()
         .collect()
