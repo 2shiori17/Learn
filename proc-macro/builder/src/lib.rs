@@ -12,10 +12,10 @@ use syn::{
 #[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    match input.data {
+    TokenStream::from(match input.data {
         Data::Struct(ref data) => StructBuilder::derive(&input, data),
         _ => unimplemented!(),
-    }
+    })
 }
 
 struct StructBuilder<'a> {
@@ -24,22 +24,20 @@ struct StructBuilder<'a> {
 }
 
 impl<'a> StructBuilder<'a> {
-    fn derive(input: &DeriveInput, data: &DataStruct) -> TokenStream {
+    fn derive(input: &DeriveInput, data: &DataStruct) -> TokenStream2 {
         let generator = StructBuilder::analyze(input, data);
-        TokenStream::from(match generator {
+        match generator {
             Ok(gen) => gen.generate(),
             Err(err) => err.to_compile_error(),
-        })
+        }
     }
 
     fn analyze(input: &'a DeriveInput, data: &'a DataStruct) -> Result<Self, SynError> {
-        let mut fields = vec![];
-        for field in &data.fields {
-            match FieldType::new(field) {
-                Ok(field) => fields.push(field),
-                Err(err) => return Err(err),
-            }
-        }
+        let fields = data
+            .fields
+            .iter()
+            .map(FieldType::new)
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(Self { input, fields })
     }
 
@@ -79,17 +77,29 @@ impl<'a> StructBuilder<'a> {
 
     fn gen_partial(&self) -> TokenStream2 {
         fields_map(&self.fields, |field| match field {
-            FieldType::Normal { ident, ty } => quote! { #ident: std::option::Option<#ty>, },
-            FieldType::Option { ident, ty } => quote! { #ident: std::option::Option<#ty>, },
-            FieldType::Each { ident, ty, .. } => quote! { #ident: std::vec::Vec<#ty>, },
+            FieldType::Normal { ident, ty } => quote! {
+                #ident: std::option::Option<#ty>,
+            },
+            FieldType::Option { ident, ty } => quote! {
+                #ident: std::option::Option<#ty>,
+            },
+            FieldType::Each { ident, ty, .. } => quote! {
+                #ident: std::vec::Vec<#ty>,
+            },
         })
     }
 
     fn gen_init(&self) -> TokenStream2 {
         fields_map(&self.fields, |field| match field {
-            FieldType::Normal { ident, .. } => quote! { #ident: None, },
-            FieldType::Option { ident, .. } => quote! { #ident: None, },
-            FieldType::Each { ident, .. } => quote! { #ident: Vec::new(), },
+            FieldType::Normal { ident, .. } => quote! {
+                #ident: std::option::Option::None,
+            },
+            FieldType::Option { ident, .. } => quote! {
+                #ident: std::option::Option::None,
+            },
+            FieldType::Each { ident, .. } => quote! {
+                #ident: std::vec::Vec::new(),
+            },
         })
     }
 
@@ -97,13 +107,13 @@ impl<'a> StructBuilder<'a> {
         fields_map(&self.fields, |field| match field {
             FieldType::Normal { ident, ty } => quote! {
                 pub fn #ident(&mut self, #ident: #ty) -> &mut Self {
-                    self.#ident = Some(#ident);
+                    self.#ident = std::option::Option::Some(#ident);
                     self
                 }
             },
             FieldType::Option { ident, ty } => quote! {
                 pub fn #ident(&mut self, #ident: #ty) -> &mut Self {
-                    self.#ident = Some(#ident);
+                    self.#ident = std::option::Option::Some(#ident);
                     self
                 }
             },
@@ -123,10 +133,10 @@ impl<'a> StructBuilder<'a> {
 
             match field {
                 FieldType::Normal { ident, .. } => quote! {
-                    let #ident = if let Some(x) = &self.#ident {
+                    let #ident = if let std::option::Option::Some(x) = &self.#ident {
                         x.clone()
                     } else {
-                        return Err(#err_msg.into());
+                        return std::result::Result::Err(#err_msg.into());
                     };
                 },
                 FieldType::Option { ident, .. } => quote! {
@@ -147,7 +157,7 @@ impl<'a> StructBuilder<'a> {
         quote! {
             #unwrapped
 
-            Ok(#target {
+            std::result::Result::Ok(#target {
                 #idents
             })
         }
@@ -187,21 +197,20 @@ impl<'a> FieldType<'a> {
 
     fn check_vec(field: &'a Field) -> Option<Result<Self, SynError>> {
         let (ident, ty) = (&field.ident, &field.ty);
-        first_generic_arg(ty, "Vec").map(|arg_type| {
-            // TODO
-            if let Some(attr) = field.attrs.first() {
-                if let Some(each) = attribute_each(attr) {
-                    return match each {
-                        Ok(each) => Ok(Self::Each {
-                            ident,
-                            ty: arg_type, // TODO
-                            each,
-                        }),
-                        Err(err) => Err(err),
-                    };
+        first_generic_arg(ty, "Vec").map(|gen_arg| {
+            if let Some(attr) = field.attrs.first()
+            && let Some(each) = attribute_each(attr) {
+                match each {
+                    Ok(each) => Ok(Self::Each {
+                        ident,
+                        ty: gen_arg,
+                        each,
+                    }),
+                    Err(err) => Err(err),
                 }
+            } else {
+                Ok(Self::Normal { ident, ty })
             }
-            Ok(Self::Normal { ident, ty })
         })
     }
 
@@ -237,7 +246,6 @@ fn first_generic_arg<'a>(target: &'a Type, ty: &str) -> Option<&'a Type> {
     })
 }
 
-// TODO
 fn attribute_each(attr: &Attribute) -> Option<Result<Ident, SynError>> {
     attr.parse_args::<ExprAssign>()
         .ok()
@@ -246,7 +254,6 @@ fn attribute_each(attr: &Attribute) -> Option<Result<Ident, SynError>> {
             && let Some(ident) = path.path.segments.first().map(|seg| &seg.ident)
             {
                 if ident != "each" {
-                    // TODO
                     return Some(Err(SynError::new_spanned(attr.parse_meta().unwrap(), "expected `builder(each = \"...\")`")))
                 }
             } else {
