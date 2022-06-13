@@ -5,8 +5,8 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Expr, ExprAssign, Field,
-    GenericArgument, Ident, Lit, PathArguments, Type,
+    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Error as SynError, Expr,
+    ExprAssign, Field, GenericArgument, Ident, Lit, PathArguments, Type,
 };
 
 #[proc_macro_derive(Builder, attributes(builder))]
@@ -26,15 +26,24 @@ struct StructBuilder<'a> {
 impl<'a> StructBuilder<'a> {
     fn derive(input: &DeriveInput, data: &DataStruct) -> TokenStream {
         let generator = StructBuilder::analyze(input, data);
-        generator.generate()
+        TokenStream::from(match generator {
+            Ok(gen) => gen.generate(),
+            Err(err) => err.to_compile_error(),
+        })
     }
 
-    fn analyze(input: &'a DeriveInput, data: &'a DataStruct) -> Self {
-        let fields = data.fields.iter().map(FieldType::new).collect();
-        Self { input, fields }
+    fn analyze(input: &'a DeriveInput, data: &'a DataStruct) -> Result<Self, SynError> {
+        let mut fields = vec![];
+        for field in &data.fields {
+            match FieldType::new(field) {
+                Ok(field) => fields.push(field),
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(Self { input, fields })
     }
 
-    fn generate(&self) -> TokenStream {
+    fn generate(&self) -> TokenStream2 {
         let target = &self.input.ident;
         let builder = format_ident!("{}Builder", target);
 
@@ -43,7 +52,7 @@ impl<'a> StructBuilder<'a> {
         let setters = self.gen_setters();
         let build = self.gen_build();
 
-        TokenStream::from(quote! {
+        quote! {
             impl #target {
                 pub fn builder() -> #builder {
                     #builder {
@@ -65,7 +74,7 @@ impl<'a> StructBuilder<'a> {
                     #build
                 }
             }
-        })
+        }
     }
 
     fn gen_partial(&self) -> TokenStream2 {
@@ -162,33 +171,37 @@ enum FieldType<'a> {
 }
 
 impl<'a> FieldType<'a> {
-    fn new(field: &'a Field) -> Self {
+    fn new(field: &'a Field) -> Result<Self, SynError> {
         Self::check_option(field)
             .or(Self::check_vec(field))
             .unwrap_or({
                 let (ident, ty) = (&field.ident, &field.ty);
-                Self::Normal { ident, ty }
+                Ok(Self::Normal { ident, ty })
             })
     }
 
-    fn check_option(field: &'a Field) -> Option<Self> {
+    fn check_option(field: &'a Field) -> Option<Result<Self, SynError>> {
         let (ident, ty) = (&field.ident, &field.ty);
-        first_generic_arg(ty, "Option").map(|ty| Self::Option { ident, ty })
+        first_generic_arg(ty, "Option").map(|ty| Ok(Self::Option { ident, ty }))
     }
 
-    fn check_vec(field: &'a Field) -> Option<Self> {
+    fn check_vec(field: &'a Field) -> Option<Result<Self, SynError>> {
         let (ident, ty) = (&field.ident, &field.ty);
         first_generic_arg(ty, "Vec").map(|arg_type| {
+            // TODO
             if let Some(attr) = field.attrs.first() {
                 if let Some(each) = attribute_each(attr) {
-                    return Self::Each {
-                        ident,
-                        ty: arg_type, // TODO
-                        each,
+                    return match each {
+                        Ok(each) => Ok(Self::Each {
+                            ident,
+                            ty: arg_type, // TODO
+                            each,
+                        }),
+                        Err(err) => Err(err),
                     };
                 }
             }
-            Self::Normal { ident, ty }
+            Ok(Self::Normal { ident, ty })
         })
     }
 
@@ -225,14 +238,17 @@ fn first_generic_arg<'a>(target: &'a Type, ty: &str) -> Option<&'a Type> {
 }
 
 // TODO
-fn attribute_each(attr: &Attribute) -> Option<Ident> {
+fn attribute_each(attr: &Attribute) -> Option<Result<Ident, SynError>> {
     attr.parse_args::<ExprAssign>()
         .ok()
         .and_then(|ExprAssign { left, right, .. }| {
             if let Expr::Path(path) = *left
             && let Some(ident) = path.path.segments.first().map(|seg| &seg.ident)
-            && ident == "each"
             {
+                if ident != "each" {
+                    // TODO
+                    return Some(Err(SynError::new_spanned(attr.parse_meta().unwrap(), "expected `builder(each = \"...\")`")))
+                }
             } else {
                 return None
             }
@@ -240,7 +256,7 @@ fn attribute_each(attr: &Attribute) -> Option<Ident> {
             if let Expr::Lit(lit) = *right
             && let Lit::Str(lit) = lit.lit
             {
-                Some(format_ident!("{}", lit.value()))
+                Some(Ok(format_ident!("{}", lit.value())))
             } else {
                 None
             }
