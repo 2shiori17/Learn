@@ -15,7 +15,8 @@ const config: UserConfig = {
       "always",
       [
         "chore",
-        "proc-macro"
+        "proc-macro",
+        "type-challenges",
       ]
     ],
   },
