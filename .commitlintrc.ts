@@ -17,6 +17,7 @@ const config: UserConfig = {
         "chore",
         "proc-macro",
         "type-challenges",
+        "nextjs-blog",
       ]
     ],
   },
