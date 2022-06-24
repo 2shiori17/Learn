@@ -1,0 +1,5 @@
+[:find ?name
+ :where
+ [?e :movie/title "RoboCop"]
+ [?e :movie/director ?p]
+ [?p :person/name ?name]]
