@@ -1,0 +1,6 @@
+[:find ?title ?rating
+ :in $ ?actor [[?title ?rating]]
+ :where
+ [?c :person/name ?actor]
+ [?m :movie/cast ?c]
+ [?m :movie/title ?title]]

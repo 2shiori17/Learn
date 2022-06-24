@@ -1,0 +1,8 @@
+[:find ?title
+ :in $ ?actor ?director
+ :where
+ [?c :person/name ?actor]
+ [?d :person/name ?director]
+ [?m :movie/cast ?c]
+ [?m :movie/director ?d]
+ [?m :movie/title ?title]]
