@@ -1,0 +1,3 @@
+[:find (min ?b)
+ :where
+ [_ :person/born ?b]]

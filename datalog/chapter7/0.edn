@@ -1,0 +1,3 @@
+[:find (count ?m)
+ :where
+ [?m :movie/title]]
