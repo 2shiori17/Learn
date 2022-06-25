@@ -1,0 +1,8 @@
+[:find ?actor
+ :where
+ [?p1 :person/name "Danny Glover"]
+ [?p1 :person/born ?b1]
+ [?p2 :person/born ?b2]
+ [_   :movie/cast  ?p2]
+ [?p2 :person/name ?actor]
+ [(< ?b2 ?b1)]]
