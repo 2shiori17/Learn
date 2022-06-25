@@ -1,0 +1,4 @@
+[:find ?inst
+ :where
+ [_ :movie/title _ ?tx]
+ [?tx :db/txInstant ?inst]]

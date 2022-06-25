@@ -1,0 +1,6 @@
+[:find ?attr
+ :in $ ?title
+ :where
+ [?m :movie/title ?title]
+ [?m ?x]
+ [?x :db/ident ?attr]]
