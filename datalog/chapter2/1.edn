@@ -1,0 +1,4 @@
+[:find ?year
+ :where
+ [?e :movie/title "Alien"]
+ [?e :movie/year ?year]]

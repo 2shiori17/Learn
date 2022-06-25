@@ -1,0 +1,3 @@
+[:find ?e ?title
+ :where
+ [?e :movie/title ?title]]

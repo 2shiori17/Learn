@@ -1,0 +1,6 @@
+[:find ?name (avg ?rating)
+ :in $ [?name ...] [[?title ?rating]]
+ :where
+ [?p :person/name ?name]
+ [?m :movie/title ?title]
+ [?m :movie/cast  ?p]]

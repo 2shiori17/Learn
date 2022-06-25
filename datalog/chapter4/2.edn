@@ -1,0 +1,8 @@
+[:find ?attr ?type ?card
+ :where
+ [_ :db.install/attribute ?a]
+ [?a :db/ident ?attr]
+ [?a :db/valueType ?t]
+ [?t :db/ident ?type]
+ [?a :db/cardinality ?c]
+ [?c :db/ident ?card]]

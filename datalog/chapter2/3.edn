@@ -1,0 +1,6 @@
+[:find ?name
+ :where
+ [?c :person/name "Arnold Schwarzenegger"]
+ [?m :movie/cast ?c]
+ [?m :movie/director ?d]
+ [?d :person/name ?name]]

@@ -1,0 +1,5 @@
+[[(sequels ?m1 ?m2)
+  [?m1 :movie/sequel ?m2]]
+ [(sequels ?m1 ?m2)
+  [?m1 :movie/sequel ?m ]
+  [?m  :movie/sequel ?m2]]]

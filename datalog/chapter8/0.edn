@@ -1,0 +1,3 @@
+[[(movie-year ?title ?year)
+  [?m :movie/title ?title]
+  [?m :movie/year  ?year ]]]

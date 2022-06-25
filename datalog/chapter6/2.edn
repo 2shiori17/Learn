@@ -1,0 +1,11 @@
+[:find ?name-1 ?name-2
+ :where
+ [?p1 :person/name ?name-1]
+ [?p1 :person/born ?born-1]
+ [?p2 :person/name ?name-2]
+ [?p2 :person/born ?born-2]
+ [(.getMonth ?born-1) ?m]
+ [(.getMonth ?born-2) ?m]
+ [(.getDate ?born-1) ?d]
+ [(.getDate ?born-2) ?d]
+ [(< ?name-1 ?name-2)]]

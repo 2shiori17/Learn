@@ -1,0 +1,6 @@
+[:find ?title
+ :in $ ?year
+ :where
+ [?m :movie/year ?y]
+ [(<= ?y ?year)]
+ [?m :movie/title ?title]]

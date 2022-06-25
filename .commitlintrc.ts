@@ -15,9 +15,11 @@ const config: UserConfig = {
       "always",
       [
         "chore",
+
+        "datalog",
+        "nextjs-blog",
         "proc-macro",
         "type-challenges",
-        "nextjs-blog",
       ]
     ],
   },

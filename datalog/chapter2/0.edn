@@ -1,0 +1,4 @@
+[:find ?title
+ :where
+ [?e :movie/year 1985]
+ [?e :movie/title ?title]]

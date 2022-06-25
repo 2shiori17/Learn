@@ -1,0 +1,6 @@
+[:find ?name
+ :in $ ?age ?today
+ :where
+ [?p :person/born ?born]
+ [?p :person/name ?name]
+ [(tutorial.fns/age ?born ?today) ?age]]

@@ -1,0 +1,9 @@
+[:find ?name ?age
+ :in $ ?today
+ :where
+ [?b :person/name "Bruce Willis"]
+ [?b :person/born ?b_born]
+ [?p :person/name ?name]
+ [?p :person/born ?p_born]
+ [(< ?b_born ?p_born)]
+ [(tutorial.fns/age ?p_born ?today) ?age]]
