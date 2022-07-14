@@ -16,6 +16,7 @@ const config: UserConfig = {
       [
         "chore",
 
+        "blog_os",
         "datalog",
         "nextjs-blog",
         "proc-macro",
