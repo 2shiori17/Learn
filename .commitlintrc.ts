@@ -20,6 +20,7 @@ const config: UserConfig = {
         "nextjs-blog",
         "proc-macro",
         "type-challenges",
+        "ziglings",
       ]
     ],
   },
